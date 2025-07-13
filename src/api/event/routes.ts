@@ -5,7 +5,10 @@ import {
   getEventById,
   createEvent,
   updateEvent,
-  deleteEvent
+  deleteEvent,
+  requestEditLock,
+  releaseEditLock,
+  maintainEditLock
 } from './controller';
 import {
   createEventValidator,
@@ -187,6 +190,79 @@ const eventRoutes: ServerRoute[] = [
         }
       },
       handler: deleteEvent
+    }
+  },
+
+  {
+    method: 'POST',
+    path: '/events/{eventId}/editable/me',
+    handler: requestEditLock,
+    options: {
+      auth: 'jwt',
+      tags: ['api', 'event', 'edit-lock'],
+      description: 'Request edit lock for an event',
+      notes: 'Only one user can edit an event at a time. Returns 200 if lock acquired, 409 if already locked.',
+      validate: {
+        params: Joi.object({
+          eventId: Joi.string().required().description('Event ID')
+        })
+      },
+      plugins: {
+        'hapi-swagger': {
+          responses: {
+            200: { description: 'Edit lock acquired' },
+            409: { description: 'Event is being edited by another user' }
+          }
+        }
+      }
+    }
+  },
+  {
+    method: 'POST',
+    path: '/events/{eventId}/editable/release',
+    handler: releaseEditLock,
+    options: {
+      auth: 'jwt',
+      tags: ['api', 'event', 'edit-lock'],
+      description: 'Release edit lock for an event',
+      notes: 'Release the edit lock so other users can edit.',
+      validate: {
+        params: Joi.object({
+          eventId: Joi.string().required().description('Event ID')
+        })
+      },
+      plugins: {
+        'hapi-swagger': {
+          responses: {
+            200: { description: 'Edit lock released' },
+            403: { description: 'You are not the editing user' }
+          }
+        }
+      }
+    }
+  },
+  {
+    method: 'POST',
+    path: '/events/{eventId}/editable/maintain',
+    handler: maintainEditLock,
+    options: {
+      auth: 'jwt',
+      tags: ['api', 'event', 'edit-lock'],
+      description: 'Maintain (extend) edit lock for an event',
+      notes: 'Extend the edit lock if still valid.',
+      validate: {
+        params: Joi.object({
+          eventId: Joi.string().required().description('Event ID')
+        })
+      },
+      plugins: {
+        'hapi-swagger': {
+          responses: {
+            200: { description: 'Edit lock extended' },
+            409: { description: 'Edit lock not valid or expired' }
+          }
+        }
+      }
     }
   }
 ];

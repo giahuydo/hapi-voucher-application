@@ -9,8 +9,21 @@ import voucherRoutes from './src/api/voucher/routes';
 import authRoutes from './src/api/auth/routes';
 import eventRoutes from './src/api/event/routes';
 import unlockVoucherLocksJob from './agenda/jobs/unlockVoucherLocks.job';
+import HapiAuthJwt2 from 'hapi-auth-jwt2';
+
 
 dotenv.config();
+
+// Validate JWT payload
+const validateJWT = async (decoded: any, request: Hapi.Request, h: Hapi.ResponseToolkit) => {
+  if (!decoded || !decoded.userId) {
+    return { isValid: false };
+  }
+  return {
+    isValid: true,
+    credentials: { id: decoded.userId }
+  };
+};
 
 const init = async () => {
   try {
@@ -25,6 +38,16 @@ const init = async () => {
       path: '/',
       handler: () => ({ message: '🎉 Hapi server is running!' })
     });
+    // Register JWT Auth
+    await server.register(HapiAuthJwt2);
+
+    server.auth.strategy('jwt', 'jwt', {
+      key: process.env.JWT_SECRET || 'default_secret',
+      validate: validateJWT,
+      verifyOptions: { algorithms: ['HS256'] },
+    });
+
+    server.auth.default('jwt'); // Protect all routes by default
 
     // Swagger
     await server.register([

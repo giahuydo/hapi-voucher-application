@@ -110,50 +110,35 @@ hapi-voucher-application/
 
 ## 📊 API Documentation
 
-### Authentication Endpoints
+### Interactive API Documentation
+Access the complete interactive API documentation at: **`http://localhost:3000/documentation`**
 
-#### POST /auth/register
-Register a new user account.
+The Swagger UI provides:
+- ✅ All available endpoints
+- ✅ Request/response schemas
+- ✅ Authentication requirements
+- ✅ Interactive testing
+- ✅ Example requests and responses
 
-#### POST /auth/login
-Authenticate user and get JWT token.
+### Available Endpoints
 
-### Event Endpoints
+#### Authentication
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - User login
 
-#### GET /events
-List all events.
+#### Events
+- `GET /events` - List all events
+- `POST /events` - Create new event
+- `GET /events/{id}` - Get event by ID
+- `PUT /events/{id}` - Update event
+- `DELETE /events/{id}` - Delete event
 
-#### POST /events
-Create a new event.
-
-#### GET /events/{id}
-Get event by ID.
-
-#### PUT /events/{id}
-Update event.
-
-#### DELETE /events/{id}
-Delete event.
-
-### Voucher Endpoints
-
-#### GET /vouchers
-List all vouchers.
-
-#### POST /events/{eventId}/vouchers
-Request a voucher for an event.
-
-#### GET /vouchers/{id}
-Get voucher by ID.
-
-#### PUT /vouchers/{id}
-Update voucher.
-
-#### DELETE /vouchers/{id}
-Delete voucher.
-
-### Swagger Documentation
-Access the interactive API documentation at: `http://localhost:3000/documentation`
+#### Vouchers
+- `GET /vouchers` - List all vouchers
+- `POST /events/{eventId}/vouchers` - Request voucher for event
+- `GET /vouchers/{id}` - Get voucher by ID
+- `PUT /vouchers/{id}` - Update voucher
+- `DELETE /vouchers/{id}` - Delete voucher
 
 ## 🧪 Testing
 
