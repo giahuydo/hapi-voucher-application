@@ -1,7 +1,11 @@
 import mongoose from 'mongoose';
 import Event from '../models/event.model';
 import Voucher from '../models/voucher.model';
+import User from '../models/user.model';
 import emailQueue from '../../jobs/queues/email.queue';
+import { AppError, NotFoundError, ValidationError, handleError } from '../../utils/errorHandler';
+import { transformResponse } from '../../utils/response';
+import logger from '../../utils/logger';
 
 interface IssueVoucherInput {
   eventId: string;
@@ -21,74 +25,131 @@ export const issueVoucher = async ({
   eventId,
   userId
 }: IssueVoucherInput): Promise<VoucherResponse> => {
-  const MAX_RETRIES = 3;
+  const session = await mongoose.startSession();
+  
+  try {
+    logger.info(`Starting voucher issuance for event ${eventId} to user ${userId}`);
+    
+    session.startTransaction();
 
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    const session = await mongoose.startSession();
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      logger.warn(`Invalid eventId format: ${eventId}`);
+      throw new ValidationError('Invalid event ID format');
+    }
 
-    try {
-      session.startTransaction();
+    // Find event with session for transaction
+    const event = await Event.findById(eventId).session(session);
+    
+    if (!event) {
+      logger.warn(`Event not found: ${eventId}`);
+      throw new NotFoundError('Event not found');
+    }
 
-      const event = await Event.findById(eventId).session(session);
-      if (!event || event.issuedCount >= event.maxQuantity) {
-        await session.abortTransaction();
-        return {
-          success: false,
-          message: '🎟️ Voucher has been exhausted.',
-          code: 456
-        };
-      }
-
-      const code = `VC-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-
-      await Voucher.create(
-        [{
-          eventId,
-          issuedTo: userId,
-          code
-        }],
-        { session }
-      );
-
-      event.issuedCount += 1;
-      await event.save({ session });
-
-      await session.commitTransaction();
-
-      // Push to email queue after commit
-      await emailQueue.add({ to: userId, code });
-
-      return {
-        success: true,
-        message: '✅ Voucher issued successfully.',
-        code: 200,
-        data: { code }
-      };
-    } catch (err: any) {
-      await session.abortTransaction();
-
-      const isRetryable = err.hasErrorLabel?.('TransientTransactionError');
-      if (isRetryable && attempt < MAX_RETRIES) {
-        console.warn(`⚠️ Retry transaction (attempt ${attempt}): ${err.message}`);
-        continue;
-      }
-
-      console.error('❌ Transaction failed:', err);
+    // Check if vouchers are available
+    if (event.issuedCount >= event.maxQuantity) {
+      logger.warn(`Event ${eventId} is exhausted. Issued: ${event.issuedCount}, Max: ${event.maxQuantity}`);
       return {
         success: false,
-        message: 'Internal server error.',
-        code: 500
+        message: '🎟️ Voucher has been exhausted.',
+        code: 456
       };
-    } finally {
-      session.endSession();
     }
-  }
 
-  return {
-    success: false,
-    message: 'Exceeded retry limit.',
-    code: 500
-  };
+    // Generate unique voucher code
+    const voucherCode = `VC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+    // Create voucher
+    const vouchers = await Voucher.create([{
+      eventId: event._id,
+      code: voucherCode,
+      issuedTo: userId,
+      isUsed: false
+    }], { session });
+
+    // Update event issued count
+    event.issuedCount += 1;
+    await event.save({ session });
+
+    // Commit transaction
+    await session.commitTransaction();
+    
+    logger.info(`Voucher issued successfully. Code: ${voucherCode}, Event: ${eventId}, User: ${userId}`);
+
+    // Add email job to queue
+    try {
+      // Find user to get email address
+      const user = await User.findById(userId);
+      if (!user || !user.email) {
+        throw new Error('User not found or missing email');
+      }
+      await emailQueue.add({
+        to: user.email,
+        code: voucherCode
+      });
+      logger.info(`Email job added to queue for voucher: ${voucherCode}`);
+    } catch (emailError: any) {
+      logger.error(`Failed to add email job to queue: ${emailError?.message || emailError}`);
+      // Don't fail the voucher issuance if email fails
+    }
+
+    return {
+      success: true,
+      message: '✅ Voucher issued successfully.',
+      code: 200,
+      data: {
+        code: voucherCode
+      }
+    };
+
+  } catch (error: any) {
+    await session.abortTransaction();
+    
+    logger.error(`Voucher issuance failed for event ${eventId}, user ${userId}:`, {
+      error: error?.message || 'Unknown error',
+      stack: error?.stack,
+      eventId,
+      userId
+    });
+
+    // Handle specific error types
+    if (error instanceof AppError) {
+      return {
+        success: false,
+        message: error.message,
+        code: error.statusCode
+      };
+    }
+
+    // Handle MongoDB transaction errors
+    if (error?.name === 'TransientTransactionError' || 
+        error?.name === 'WriteConflict' ||
+        error?.message?.includes('WriteConflict')) {
+      
+      logger.warn(`Transient transaction error, retrying voucher issuance for event ${eventId}`);
+      
+      // Retry once for transient errors
+      try {
+        return await issueVoucher({ eventId, userId });
+      } catch (retryError: any) {
+        logger.error(`Retry failed for voucher issuance: ${retryError?.message || 'Unknown error'}`);
+        return {
+          success: false,
+          message: 'Internal server error.',
+          code: 500
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: 'Internal server error.',
+      code: 500
+    };
+
+  } finally {
+    session.endSession();
+  }
 };
 
 

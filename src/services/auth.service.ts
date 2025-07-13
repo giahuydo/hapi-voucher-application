@@ -1,5 +1,8 @@
 import jwt from 'jsonwebtoken';
 import User, { UserDocument } from '../models/user.model';
+import { AppError, ValidationError, NotFoundError } from '../../utils/errorHandler';
+import { transformResponse } from '../../utils/response';
+import logger from '../../utils/logger';
 
 interface LoginInput {
   email: string;
@@ -29,9 +32,12 @@ interface AuthResponse {
 
 export const register = async (input: RegisterInput): Promise<AuthResponse> => {
   try {
+    logger.info(`Starting user registration for email: ${input.email}`);
+    
     // Check if user already exists
     const existingUser = await User.findOne({ email: input.email });
     if (existingUser) {
+      logger.warn(`Registration failed - User already exists: ${input.email}`);
       return {
         success: false,
         message: 'User already exists with this email',
@@ -47,6 +53,7 @@ export const register = async (input: RegisterInput): Promise<AuthResponse> => {
     });
 
     await user.save();
+    logger.info(`User registered successfully: ${input.email}`);
 
     // Generate JWT token
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
@@ -70,8 +77,12 @@ export const register = async (input: RegisterInput): Promise<AuthResponse> => {
         }
       }
     };
-  } catch (error) {
-    console.error('Registration error:', error);
+  } catch (error: any) {
+    logger.error(`Registration failed for email ${input.email}:`, {
+      error: error?.message || 'Unknown error',
+      stack: error?.stack
+    });
+    
     return {
       success: false,
       message: 'Registration failed',
@@ -82,9 +93,12 @@ export const register = async (input: RegisterInput): Promise<AuthResponse> => {
 
 export const login = async (input: LoginInput): Promise<AuthResponse> => {
   try {
+    logger.info(`Starting login attempt for email: ${input.email}`);
+    
     // Find user by email
     const user = await User.findOne({ email: input.email });
     if (!user) {
+      logger.warn(`Login failed - User not found: ${input.email}`);
       return {
         success: false,
         message: 'Invalid credentials',
@@ -94,6 +108,7 @@ export const login = async (input: LoginInput): Promise<AuthResponse> => {
 
     // Check if user is active
     if (!user.isActive) {
+      logger.warn(`Login failed - Account deactivated: ${input.email}`);
       return {
         success: false,
         message: 'Account is deactivated',
@@ -104,6 +119,7 @@ export const login = async (input: LoginInput): Promise<AuthResponse> => {
     // Verify password
     const isPasswordValid = await user.comparePassword(input.password);
     if (!isPasswordValid) {
+      logger.warn(`Login failed - Invalid password for: ${input.email}`);
       return {
         success: false,
         message: 'Invalid credentials',
@@ -119,6 +135,8 @@ export const login = async (input: LoginInput): Promise<AuthResponse> => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
+    logger.info(`Login successful for user: ${input.email}`);
+    
     return {
       success: true,
       message: 'Login successful',
@@ -133,8 +151,12 @@ export const login = async (input: LoginInput): Promise<AuthResponse> => {
         }
       }
     };
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch (error: any) {
+    logger.error(`Login failed for email ${input.email}:`, {
+      error: error?.message || 'Unknown error',
+      stack: error?.stack
+    });
+    
     return {
       success: false,
       message: 'Login failed',
@@ -146,8 +168,11 @@ export const login = async (input: LoginInput): Promise<AuthResponse> => {
 export const verifyToken = (token: string) => {
   try {
     const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
-    return (jwt as any).verify(token, jwtSecret);
-  } catch (error) {
+    const decoded = (jwt as any).verify(token, jwtSecret);
+    logger.debug(`Token verified successfully for user: ${decoded?.email || 'unknown'}`);
+    return decoded;
+  } catch (error: any) {
+    logger.warn(`Token verification failed: ${error?.message || 'Unknown error'}`);
     return null;
   }
 }; 

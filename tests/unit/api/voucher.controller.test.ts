@@ -11,10 +11,16 @@ const mockVoucherService = voucherService as jest.Mocked<typeof voucherService>;
 describe('Voucher Controller', () => {
   let mockRequest: Partial<Request>;
   let mockH: Partial<ResponseToolkit>;
+  let mockResponse: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
     console.log(`🧪 Running controller tests with ${TEST_CONFIG.USE_MOCK_DB ? 'mock' : 'real'} database`);
+
+    // Mock response object
+    mockResponse = {
+      code: jest.fn().mockReturnThis()
+    };
 
     // Mock request object
     mockRequest = {
@@ -24,23 +30,21 @@ describe('Voucher Controller', () => {
 
     // Mock response toolkit
     mockH = {
-      response: jest.fn().mockReturnValue({
-        code: jest.fn().mockReturnThis()
-      })
+      response: jest.fn().mockReturnValue(mockResponse)
     } as Partial<ResponseToolkit>;
   });
 
   describe('requestVoucher', () => {
     it('should return success response when voucher is issued', async () => {
       // Arrange
-      const mockResponse = {
+      const mockServiceResponse = {
         success: true,
         message: '✅ Voucher issued successfully.',
         code: 200,
         data: { code: 'VC-ABC123' }
       };
 
-      mockVoucherService.issueVoucher.mockResolvedValue(mockResponse);
+      mockVoucherService.issueVoucher.mockResolvedValue(mockServiceResponse);
 
       // Act
       const result = await requestVoucher(
@@ -59,18 +63,18 @@ describe('Voucher Controller', () => {
         data: { code: 'VC-ABC123' }
       });
 
-      expect(result.code).toBe(200);
+      expect(mockResponse.code).toHaveBeenCalledWith(200);
     });
 
     it('should return error response when voucher issuance fails', async () => {
       // Arrange
-      const mockResponse = {
+      const mockServiceResponse = {
         success: false,
         message: '🎟️ Voucher has been exhausted.',
         code: 456
       };
 
-      mockVoucherService.issueVoucher.mockResolvedValue(mockResponse);
+      mockVoucherService.issueVoucher.mockResolvedValue(mockServiceResponse);
 
       // Act
       const result = await requestVoucher(
@@ -88,18 +92,18 @@ describe('Voucher Controller', () => {
         message: '🎟️ Voucher has been exhausted.'
       });
 
-      expect(result.code).toBe(456);
+      expect(mockResponse.code).toHaveBeenCalledWith(456);
     });
 
     it('should handle service errors gracefully', async () => {
       // Arrange
-      const mockResponse = {
+      const mockServiceResponse = {
         success: false,
         message: 'Internal server error.',
         code: 500
       };
 
-      mockVoucherService.issueVoucher.mockResolvedValue(mockResponse);
+      mockVoucherService.issueVoucher.mockResolvedValue(mockServiceResponse);
 
       // Act
       const result = await requestVoucher(
@@ -112,7 +116,7 @@ describe('Voucher Controller', () => {
         message: 'Internal server error.'
       });
 
-      expect(result.code).toBe(500);
+      expect(mockResponse.code).toHaveBeenCalledWith(500);
     });
 
     it('should handle missing data in request', async () => {

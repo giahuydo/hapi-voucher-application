@@ -7,7 +7,7 @@ import { TEST_CONFIG } from '../../setup';
 // Mock dependencies
 jest.mock('../../../src/models/event.model');
 jest.mock('../../../src/models/voucher.model');
-jest.mock('../../../src/jobs/queues/email.queue');
+jest.mock('../../../jobs/queues/email.queue');
 
 const mockEvent = Event as jest.Mocked<typeof Event>;
 const mockVoucher = Voucher as jest.Mocked<typeof Voucher>;

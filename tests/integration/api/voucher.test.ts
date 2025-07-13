@@ -26,7 +26,7 @@ describe('Voucher API Integration Tests', () => {
     await Voucher.deleteMany({});
   });
 
-  describe('POST /events/{eventId}/request-voucher', () => {
+  describe('POST /events/{eventId}/vouchers', () => {
     it('should create voucher successfully', async () => {
       // Arrange
       const event = await Event.create({
@@ -41,7 +41,7 @@ describe('Voucher API Integration Tests', () => {
 
       // Act
       const response = await request(server.listener)
-        .post(`/events/${event._id}/request-voucher`)
+        .post(`/events/${event._id}/vouchers`)
         .send(payload)
         .expect(200);
 
@@ -74,7 +74,7 @@ describe('Voucher API Integration Tests', () => {
 
       // Act & Assert
       const response = await request(server.listener)
-        .post(`/events/${event._id}/request-voucher`)
+        .post(`/events/${event._id}/vouchers`)
         .send(payload)
         .expect(456);
 
@@ -90,7 +90,7 @@ describe('Voucher API Integration Tests', () => {
 
       // Act & Assert
       await request(server.listener)
-        .post('/events/invalid-id/request-voucher')
+        .post('/events/invalid-id/vouchers')
         .send(payload)
         .expect(400);
     });
@@ -107,7 +107,7 @@ describe('Voucher API Integration Tests', () => {
 
       // Act & Assert
       await request(server.listener)
-        .post(`/events/${event._id}/request-voucher`)
+        .post(`/events/${event._id}/vouchers`)
         .send(payload)
         .expect(400);
     });
@@ -127,13 +127,13 @@ describe('Voucher API Integration Tests', () => {
       // Act - Make concurrent requests
       const [response1, response2, response3] = await Promise.all([
         request(server.listener)
-          .post(`/events/${event._id}/request-voucher`)
+          .post(`/events/${event._id}/vouchers`)
           .send(payload1),
         request(server.listener)
-          .post(`/events/${event._id}/request-voucher`)
+          .post(`/events/${event._id}/vouchers`)
           .send(payload2),
         request(server.listener)
-          .post(`/events/${event._id}/request-voucher`)
+          .post(`/events/${event._id}/vouchers`)
           .send(payload3)
       ]);
 
@@ -158,7 +158,7 @@ describe('Voucher API Integration Tests', () => {
 
       // Act & Assert - Test with invalid ObjectId format
       await request(server.listener)
-        .post('/events/12345678901234567890123/request-voucher') // Invalid ObjectId
+        .post('/events/12345678901234567890123/vouchers') // Invalid ObjectId
         .send(payload)
         .expect(400);
     });

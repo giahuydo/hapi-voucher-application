@@ -5,12 +5,12 @@
       "strict": true,                        // Enable all strict type-checking options
       "esModuleInterop": true,               // Allow default imports from CommonJS modules
       "outDir": "./dist",                    // Output directory for compiled JavaScript files
-      "rootDir": "./src",                    // Specify the root folder of your TypeScript source files
+      "rootDir": ".",                    // Specify the root folder of your TypeScript source files
       "resolveJsonModule": true,             // Enable importing .json files as modules
       "moduleResolution": "node",            // Match module resolution as used in Node.js
       "skipLibCheck": true                   // Skip type checking of all declaration files (*.d.ts) for faster builds
     },
-    "include": ["src/**/*"],                 // Include all TypeScript files inside the src/ folder
+    "include": ["src/**/*", "utils"],                 // Include all TypeScript files inside the src/ folder
     "exclude": ["node_modules"]              // Exclude dependencies from compilation
   }
   

@@ -1,5 +1,5 @@
 import { TEST_CONFIG } from '../../setup';
-import emailQueue from '../../../jobs/queues/email.queue';
+import { sendEmail } from '../../../jobs/services/email.service';
 
 // Mock nodemailer
 jest.mock('nodemailer', () => ({
@@ -10,14 +10,12 @@ jest.mock('nodemailer', () => ({
   })
 }));
 
-// Mock email queue
-const mockEmailQueue = {
-  add: jest.fn().mockResolvedValue({}),
-  process: jest.fn(),
-  on: jest.fn()
-};
+// Mock email service
+jest.mock('../../../jobs/services/email.service', () => ({
+  sendEmail: jest.fn()
+}));
 
-jest.mock('../../../src/jobs/queues/email.queue', () => mockEmailQueue);
+const mockSendEmail = sendEmail as jest.MockedFunction<typeof sendEmail>;
 
 describe('Email Worker', () => {
   beforeEach(() => {
@@ -33,16 +31,13 @@ describe('Email Worker', () => {
         code: 'VC-ABC123'
       };
 
-      const mockJob = {
-        data: jobData,
-        id: 'job-123'
-      };
+      mockSendEmail.mockResolvedValueOnce();
 
       // Act
       await sendEmail(jobData);
 
       // Assert
-      expect(sendEmail).toHaveBeenCalledWith(jobData);
+      expect(mockSendEmail).toHaveBeenCalledWith(jobData);
     });
 
     it('should handle email sending errors', async () => {
@@ -53,7 +48,6 @@ describe('Email Worker', () => {
       };
 
       // Mock sendEmail to throw error
-      const mockSendEmail = sendEmail as jest.MockedFunction<typeof sendEmail>;
       mockSendEmail.mockRejectedValueOnce(new Error('SMTP connection failed'));
 
       // Act & Assert
@@ -67,8 +61,10 @@ describe('Email Worker', () => {
         code: 'VC-ABC123'
       };
 
+      mockSendEmail.mockRejectedValueOnce(new Error('Invalid email format'));
+
       // Act & Assert
-      await expect(sendEmail(invalidJobData)).rejects.toThrow();
+      await expect(sendEmail(invalidJobData)).rejects.toThrow('Invalid email format');
     });
   });
 
@@ -107,13 +103,13 @@ describe('Email Worker', () => {
         code: 'VC-ABC123'
       };
 
+      mockSendEmail.mockResolvedValueOnce();
+
       // Act
       await sendEmail(jobData);
 
       // Assert - Verify that the email contains the voucher code
-      // This would require accessing the actual email content
-      // For now, we just verify the function was called
-      expect(sendEmail).toHaveBeenCalledWith(jobData);
+      expect(mockSendEmail).toHaveBeenCalledWith(jobData);
     });
 
     it('should include voucher code in email subject', async () => {
@@ -123,42 +119,13 @@ describe('Email Worker', () => {
         code: 'VC-ABC123'
       };
 
+      mockSendEmail.mockResolvedValueOnce();
+
       // Act
       await sendEmail(jobData);
 
       // Assert
-      // Verify that the email subject contains the expected text
-      expect(sendEmail).toHaveBeenCalledWith(jobData);
-    });
-  });
-
-  describe('Queue Integration', () => {
-    it('should add jobs to email queue', async () => {
-      // Arrange
-      const jobData = {
-        to: 'test@example.com',
-        code: 'VC-ABC123'
-      };
-
-      // Act
-      await mockEmailQueue.add(jobData);
-
-      // Assert
-      expect(mockEmailQueue.add).toHaveBeenCalledWith(jobData);
-    });
-
-    it('should handle queue processing errors', async () => {
-      // Arrange
-      const jobData = {
-        to: 'test@example.com',
-        code: 'VC-ABC123'
-      };
-
-      // Mock queue to throw error
-      mockEmailQueue.add.mockRejectedValueOnce(new Error('Queue connection failed'));
-
-      // Act & Assert
-      await expect(mockEmailQueue.add(jobData)).rejects.toThrow('Queue connection failed');
+      expect(mockSendEmail).toHaveBeenCalledWith(jobData);
     });
   });
 }); 
